@@ -22,7 +22,6 @@ variable "default_zone" {
 
 variable "default_cidr" {
   type        = list(string)
-  default     = ["10.0.1.0/24"]
   description = "https://cloud.yandex.ru/docs/vpc/operations/subnet-create"
 }
 
@@ -67,6 +66,15 @@ variable "vm_web_subnet_nat" {
   default     = true
   description = "Should the web subnet have NAT"
 }
+variable "auth_db" {
+  type = map(map(any))
+  default = {
+    "deb" = {
+      "name" = "deb"
+      "password" = "1234567890"
+    }
+  }
+}
 
 variable "vms_resources" {
   type = map(map(any))
@@ -75,6 +83,10 @@ variable "vms_resources" {
       "cores" = 2
       "memory" = 1  
       "core_fraction" = 5
+      "hdd_size" = 10
+      "hdd_type" = "network-hdd"
+    }
+    "db" = {
       "hdd_size" = 10
       "hdd_type" = "network-hdd"
     }
@@ -96,6 +108,11 @@ variable "subnet_id" {
   type        = string
 }
 
+variable "network_id" {
+  description = "ID сети для виртуальной машины"
+  type        = string
+  }
+
 variable "security_group_ids" {
   description = "ID групп безопасности"
   type        = list(string)
@@ -105,4 +122,14 @@ variable "instance_name" {
   description = "Имя инстанса"
   type        = string
   default     = "web"
+}
+
+variable "lockbox_secret_id" {
+  description = "ID LockBox"
+  type = string
+}
+
+variable "vm_service_account_id" {
+  description = "ID сервисного аккаунта для ВМ"
+  type        = string
 }

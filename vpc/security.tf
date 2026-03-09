@@ -84,3 +84,23 @@ resource "yandex_vpc_security_group" "web" {
     }
   }
 }
+
+
+resource "yandex_vpc_security_group" "allow_mysql" {
+  name        = "allow_mysql"
+  description = "Allow MySQL access"
+  network_id  = yandex_vpc_network.develop.id
+
+  ingress {
+    description = "Allow MySQL access from web VM"
+    protocol    = "TCP"
+    port        = 3306
+    v4_cidr_blocks = [ "10.0.1.0/24" ]
+  }
+  egress {
+    description = "Allow all outbound traffic"
+    protocol    = "TCP"
+    port        = 0
+    v4_cidr_blocks = ["0.0.0.0/0"]
+  }
+} 

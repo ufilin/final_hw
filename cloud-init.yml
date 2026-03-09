@@ -1,4 +1,5 @@
 #cloud-config
+
 users:
   - name: ubuntu
     groups: sudo
@@ -9,5 +10,56 @@ users:
 package_update: true
 package_upgrade: false
 packages:
-  - vim
-  - nginx
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - software-properties-common
+  - git
+runcmd:
+  - curl -fsSL https://get.docker.com -o get-docker.sh
+  - sh get-docker.sh
+
+  - curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+  - chmod +x /usr/local/bin/docker-compose
+
+  - usermod -aG docker ubuntu
+  
+  - systemctl enable docker
+  - systemctl start docker
+
+  - docker --version > /home/ubuntu/docker-version.txt
+  - docker-compose --version >> /home/ubuntu/docker-version.txt
+  - mkdir -p /home/ubuntu/app
+  - chown ubuntu:ubuntu /home/ubuntu/app
+
+  - echo "DB_HOST=${DB_HOST}" > /home/ubuntu/app/.env
+  - echo "DB_USER=${DB_USER}" >> /home/ubuntu/app/.env
+  - echo "DB_PASSWORD=${DB_PASSWORD}" >> /home/ubuntu/app/.env
+  - echo "DB_NAME=${DB_NAME}" >> /home/ubuntu/app/.env
+  - echo "REGISTRY_ID=${REGISTRY_ID}" >> /home/ubuntu/app/.env
+
+  - |
+    echo "Building docker-compose.yml file..."
+    cat > /home/ubuntu/app/docker-compose.yml <<EOF
+    version: '3.8'
+    services:
+      web-app:
+        image: cr.yandex/\${REGISTRY_ID}/my-web-app:v1
+        ports:
+          - "80:5000"
+        environment:
+          - DB_HOST=\${DB_HOST}
+          - DB_PORT=3306
+          - DB_USER=\${DB_USER}
+          - DB_PASSWORD=\${DB_PASSWORD}
+          - DB_NAME=\${DB_NAME}
+          - PORT=5000
+        restart: unless-stopped
+        networks:
+          - app-network
+    networks:
+      app-network:
+        driver: bridge
+    EOF
+
+  - cd /home/ubuntu/app && docker-compose up -d

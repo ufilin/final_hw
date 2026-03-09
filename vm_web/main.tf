@@ -1,6 +1,7 @@
 data "yandex_compute_image" "ubuntu" {
   family = var.vm_web_family
 }
+
 resource "yandex_compute_instance" "web" {
   hostname = "web"
   name        = "web"
@@ -26,8 +27,17 @@ resource "yandex_compute_instance" "web" {
     nat       = var.vm_web_subnet_nat
     security_group_ids = var.security_group_ids
   }
+  service_account_id = var.vm_service_account_id
 
   metadata = {
     ssh-keys = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
+    user-data = templatefile("${path.module}/cloud-init.yml", {
+      DB_HOST     = yandex_mdb_mysql_cluster.my_cluster.host[0].fqdn
+      DB_USER     = yandex_mdb_mysql_user.my_user.name
+      DB_PASSWORD = var.auth_db["deb"]["password"]
+      DB_NAME     = yandex_mdb_mysql_database.db.name
+      REGISTRY_ID = yandex_container_registry.ufilin.id
+      LOCKBOX_SECRET_ID = var.lockbox_secret_id
+  })
   }
 }

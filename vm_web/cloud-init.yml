@@ -1,0 +1,69 @@
+#cloud-config
+
+package_update: true
+package_upgrade: false
+
+packages:
+  - docker.io
+  - docker-compose
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - software-properties-common
+  - git
+  - python3-pip
+
+runcmd:
+  - systemctl enable docker
+  - systemctl start docker
+  
+  - usermod -aG docker ubuntu
+  
+  - docker --version > /home/ubuntu/docker-version.txt
+  - docker-compose --version >> /home/ubuntu/docker-version.txt
+  - chown ubuntu:ubuntu /home/ubuntu/docker-version.txt
+  
+  - chmod 666 /var/run/docker.sock || true
+
+  - mkdir -p /home/ubuntu/.docker
+
+  - mkdir -p /home/ubuntu/app
+  - chown ubuntu:ubuntu /home/ubuntu/app
+
+  - echo "DB_HOST=${DB_HOST}" > /home/ubuntu/app/.env
+  - echo "DB_USER=${DB_USER}" >> /home/ubuntu/app/.env
+  - echo "DB_PASSWORD=${DB_PASSWORD}" >> /home/ubuntu/app/.env
+  - echo "DB_NAME=${DB_NAME}" >> /home/ubuntu/app/.env
+  - echo "REGISTRY_ID=${REGISTRY_ID}" >> /home/ubuntu/app/.env
+
+  - |
+    cat > /home/ubuntu/app/docker-compose.yml <<EOF
+    version: '3.3'
+    services:
+      web-app:
+        image: cr.yandex/${REGISTRY_ID}/my-web-app:v1
+        ports:
+          - "80:5000"
+        environment:
+          - DB_HOST=${DB_HOST}
+          - DB_PORT=3306
+          - DB_USER=${DB_USER}
+          - DB_PASSWORD=${DB_PASSWORD}
+          - DB_NAME=${DB_NAME}
+          - PORT=5000
+        restart: unless-stopped
+    EOF
+
+  - chown ubuntu:ubuntu /home/ubuntu/app/docker-compose.yml
+
+  - IAM_TOKEN=$(curl -s -H "Metadata-Flavor: Google" http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token | python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
+  
+  # Получение ключа из LockBox (используем переданный ID)
+  - |
+    curl -s -H "Authorization: Bearer $IAM_TOKEN" \
+      https://payload.lockbox.api.cloud.yandex.net/lockbox/v1/secrets/${LOCKBOX_SECRET_ID}/payload \
+      | python3 -c "import sys, json; data=json.load(sys.stdin); print([e['textValue'] for e in data['entries'] if e['key']=='key.json'][0])" \
+      > /home/ubuntu/key.json
+
+  # Авторизация в Docker
+  - cat /home/ubuntu/key.json | docker login --username json_key --password-stdin cr.yandex
