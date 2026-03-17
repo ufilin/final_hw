@@ -117,5 +117,16 @@ runcmd:
 
   - python3 /home/ubuntu/init_db.py
 
+  - sleep 10
+  
+  - |
+    cd /home/ubuntu/app
+    docker-compose pull
+    docker-compose up -d
+    echo "Container started successfully"
+  
+  - docker ps > /home/ubuntu/container-status.txt
+  - curl -s http://localhost/ || echo "Container not responding yet, but will restart automatically"
+
 final_message: "The system is finally up, after $UPTIME seconds"
 

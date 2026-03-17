@@ -6,6 +6,7 @@ resource "null_resource" "build_and_push_image" {
   triggers = {
     registry_id = module.vm_web.registry_info.id 
     dockerfile_hash = filesha1("${path.module}/app/dockerfile")
+    requirements_hash = filesha1("${path.module}/app/requirements.txt")
     app_hash = filesha1("${path.module}/app/app.py")
   }
 
