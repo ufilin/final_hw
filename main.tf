@@ -33,7 +33,7 @@ resource "yandex_lockbox_secret_version" "sa_key_version" {
   
   entries {
     key        = "key.json"
-    text_value = file("~/.ssh/key.json")
+    text_value = file("/home/debian/.ssh/key.json")
   }
 }
 

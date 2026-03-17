@@ -12,30 +12,31 @@ packages:
   - software-properties-common
   - git
   - python3-pip
+  - python3-mysql.connector
 
 runcmd:
+  # Docker setup
   - systemctl enable docker
   - systemctl start docker
-  
   - usermod -aG docker ubuntu
+  - systemctl restart docker
   
-  - docker --version > /home/ubuntu/docker-version.txt
-  - docker-compose --version >> /home/ubuntu/docker-version.txt
-  - chown ubuntu:ubuntu /home/ubuntu/docker-version.txt
-  
-  - chmod 666 /var/run/docker.sock || true
-
-  - mkdir -p /home/ubuntu/.docker
-
+  # Create app directory and set permissions
   - mkdir -p /home/ubuntu/app
   - chown ubuntu:ubuntu /home/ubuntu/app
-
-  - echo "DB_HOST=${DB_HOST}" > /home/ubuntu/app/.env
-  - echo "DB_USER=${DB_USER}" >> /home/ubuntu/app/.env
-  - echo "DB_PASSWORD=${DB_PASSWORD}" >> /home/ubuntu/app/.env
-  - echo "DB_NAME=${DB_NAME}" >> /home/ubuntu/app/.env
-  - echo "REGISTRY_ID=${REGISTRY_ID}" >> /home/ubuntu/app/.env
-
+  
+  # Create .env file with database credentials
+  - |
+    cat > /home/ubuntu/app/.env <<EOF
+    DB_HOST=rc1a-s7b9dtesg0mfkafq.mdb.yandexcloud.net
+    DB_USER=deb
+    DB_PASSWORD=1234567890
+    DB_NAME=db
+    REGISTRY_ID=crp9teg93tqdkubpifvm
+    PORT=5000
+    EOF
+  
+  # Create docker-compose.yml
   - |
     cat > /home/ubuntu/app/docker-compose.yml <<EOF
     version: '3.3'
@@ -53,17 +54,68 @@ runcmd:
           - PORT=5000
         restart: unless-stopped
     EOF
-
-  - chown ubuntu:ubuntu /home/ubuntu/app/docker-compose.yml
-
-  - IAM_TOKEN=$(curl -s -H "Metadata-Flavor: Google" http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token | python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
   
-  # Получение ключа из LockBox (используем переданный ID)
+  - chown ubuntu:ubuntu /home/ubuntu/app/docker-compose.yml
+  - chown ubuntu:ubuntu /home/ubuntu/app/.env
+  
+  # Get IAM token and LockBox secret
+  - |
+    IAM_TOKEN=$(curl -s -H "Metadata-Flavor: Google" http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token | python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
+  
   - |
     curl -s -H "Authorization: Bearer $IAM_TOKEN" \
       https://payload.lockbox.api.cloud.yandex.net/lockbox/v1/secrets/${LOCKBOX_SECRET_ID}/payload \
       | python3 -c "import sys, json; data=json.load(sys.stdin); print([e['textValue'] for e in data['entries'] if e['key']=='key.json'][0])" \
       > /home/ubuntu/key.json
-
-  # Авторизация в Docker
+  
+  # Docker login
   - cat /home/ubuntu/key.json | docker login --username json_key --password-stdin cr.yandex
+  
+  # Set proper permissions
+  - chown ubuntu:ubuntu /home/ubuntu/key.json
+  - chmod 600 /home/ubuntu/key.json
+  
+  # Verify docker group membership
+  - groups ubuntu > /home/ubuntu/groups.txt
+
+  - |
+    cat > /home/ubuntu/init_db.py << 'EOF'
+    import mysql.connector
+    import time
+    
+    DB_HOST="rc1a-s7b9dtesg0mfkafq.mdb.yandexcloud.net"
+    DB_USER="deb"
+    DB_PASSWORD="1234567890"
+    DB_NAME="db"
+    
+    max_retries = 10
+    for i in range(max_retries):
+        try:
+            conn = mysql.connector.connect(
+                host=DB_HOST, user=DB_USER, password=DB_PASSWORD,
+                database=DB_NAME, port=3306, connection_timeout=10
+            )
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS messages (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    title VARCHAR(200) NOT NULL,
+                    content TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("INSERT IGNORE INTO messages (title, content) VALUES ('Welcome', 'Auto-created by cloud-init')")
+            conn.commit()
+            cursor.close()
+            conn.close()
+            print("Database initialized")
+            break
+        except Exception as e:
+            print(f"Attempt {i+1} failed: {e}")
+            time.sleep(5)
+    EOF
+
+  - python3 /home/ubuntu/init_db.py
+
+final_message: "The system is finally up, after $UPTIME seconds"
+

@@ -13,12 +13,12 @@ resource "yandex_mdb_mysql_user" "my_user" {
     roles         = ["ALL", "INSERT"]
   }
 
-  connection_limits {
+  /*connection_limits {
     max_questions_per_hour   = 10
     max_updates_per_hour     = 20
     max_connections_per_hour = 30
     max_user_connections     = 40
-  }
+  }*/
 
   global_permissions = ["PROCESS"]
 

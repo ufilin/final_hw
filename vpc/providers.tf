@@ -9,7 +9,6 @@ terraform {
 }
 
 provider "yandex" {
-  #token     = var.token
   service_account_key_file = pathexpand(var.secret_key_file) 
   cloud_id  = var.cloud_id
   folder_id = var.folder_id
