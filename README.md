@@ -7,7 +7,7 @@
 ### Задание 1. Инфраструктура в Yandex Cloud
 
 <p align="center">
-  <img src="final_hw-1.png" width="800">
+  <img src="screenshots/final_hw-1.png" width="800">
 </p>  
 
 📸 СКРИНШОТ 1: Вставьте здесь скриншот вывода команд, показывающий созданные ресурсы в Yandex Cloud
